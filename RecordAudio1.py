@@ -26,11 +26,10 @@ def normalize(snd_data):
     MAXIMUM = 16384
     times = float(MAXIMUM)/max(abs(i) for i in snd_data)
     
-    
-
-    r = array('h')
+        r = array('h')
     for i in snd_data:
         r.append(int(i*times))
+        
     return r
 
 def trim(snd_data):

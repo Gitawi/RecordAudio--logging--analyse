@@ -11,7 +11,7 @@ import pyaudio
 import wave
 
 # THRESHOLD = 500
-THRESHOLD = 6000
+THRESHOLD = 10000
 
 CHUNK_SIZE = 1024
 FORMAT = pyaudio.paInt16
@@ -152,9 +152,9 @@ def record():
     stream.close()
     p.terminate()
 
-    r = normalize(r)
-    r = trim(r)
-    r = add_silence(r, 0.5)
+    # r = normalize(r)
+    # r = trim(r)
+    # r = add_silence(r, 0.5)
     return sample_width, r
 
 def record_to_file(path):

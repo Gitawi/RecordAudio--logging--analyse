@@ -5,12 +5,13 @@ from sys import byteorder
 from array import array
 from struct import pack
 import time
+import datetime
 
 import pyaudio
 import wave
 
 # THRESHOLD = 500
-THRESHOLD = 10000
+THRESHOLD = 6000
 
 CHUNK_SIZE = 1024
 FORMAT = pyaudio.paInt16
@@ -18,15 +19,14 @@ RATE = 44100
 
 def is_silent(snd_data):
     "Returns 'True' if below the 'silent' threshold"
-    print(max(snd_data), end=", ", flush=True)
+    #print(max(snd_data), end=", ", flush=True)
     return max(snd_data) < THRESHOLD
 
 def normalize(snd_data):
     "Average the volume out"
     MAXIMUM = 16384
     times = float(MAXIMUM)/max(abs(i) for i in snd_data)
-    
-        r = array('h')
+    r = array('h')
     for i in snd_data:
         r.append(int(i*times))
         
@@ -64,48 +64,87 @@ def add_silence(snd_data, seconds):
     return r
 
 def record():
+    
     """
     Record a word or words from the microphone and 
     return the data as an array of signed shorts.
 
-    Normalizes the audio, trims silence from the 
-    start and end, and pads with 0.5 seconds of 
-    blank sound to make sure VLC et al can play 
+    Normalizes the audio, trims silence from the
+    start and end, and pads with 0.5 seconds of   
+     blank sound to make sure VLC et al can play 
     it without getting chopped off.
     """
+    # Startar pyAudio
     p = pyaudio.PyAudio()
+    # Öppnar en p.stream
     stream = p.open(format=FORMAT, channels=1, rate=RATE,
         input=True, output=True,
         frames_per_buffer=CHUNK_SIZE)
 
+    # Nollar startvärden
     num_silent = 0
     snd_started = False
-
+    snd_data = array('h', stream.read(CHUNK_SIZE))
+    if byteorder == 'big':
+            snd_data.byteswap()
+    # ... och ljudarrayen
     r = array('h')
-    print("\n\n Into While ...")
+
+    # Startar loopen
+    tiden = time.time()
+    Timestamp = str(datetime.datetime.fromtimestamp(tiden).strftime('%Y%m%d %H:%M:%S'))
+    print("\n Into While ... ", Timestamp)
     while 1:
         # little endian, signed short
+        # Laddar en chunk ur streamen till snd_data
+        # fortsätter streamen recorda??
+        snd_dataold = snd_data
         snd_data = array('h', stream.read(CHUNK_SIZE))
         
         if byteorder == 'big':
             snd_data.byteswap()
-        r.extend(snd_data)
 
+       
+
+        # r chunken tyst??
         silent = is_silent(snd_data)
 
-        if silent and snd_started:
-            time.sleep(1)
-            num_silent += 1
-        elif not silent and not snd_started:
-            snd_started = True
-            print("\n")
-            print("snd_started")
+        # Testa nya chunken
+        if snd_started: 
+            # Lägg sista chunken till r - ljudarrayen
+            r.extend(snd_dataold)    
+            r.extend(snd_data)
+            if silent:
+                num_silent += 1
+            else:
+                num_silent = 0
+        else:
+            if not silent:
+                snd_started = True
+                # Addera sista chunken till r - ljudarrayen    
+                r.extend(snd_data)
+                tiden = time.time()
+                Timestamp = str(datetime.datetime.fromtimestamp(tiden).strftime('%Y%m%d %H:%M:%S'))
+                print(" snd_started    ", Timestamp)
+                
+                
 
-        if snd_started and num_silent > 30:
-            # print("\n")
-            print("\nTyst för länge")
+        # if silent and snd_started:   # Slut på ljud under inspelning
+        #     num_silent += 1
+        # elif not silent and not snd_started: # Ljud:-> Starta inspelning
+        #     snd_started = True 
+        # elif snd_started: # Ljud:-> Starta inspelning
+        #     snd_started = True
+            
+
+        if snd_started and num_silent > 500: # Varit tyst länge nu ...
+            tiden = time.time()
+            Timestamp = str(datetime.datetime.fromtimestamp(tiden).strftime('%Y%m%d %H:%M:%S'))
+            print(" Tyst för länge ", Timestamp)
             break
-    print("Outof While ...")
+
+
+    
         
         
     sample_width = p.get_sample_size(FORMAT)
@@ -121,8 +160,9 @@ def record():
 def record_to_file(path):
     "Records from the microphone and outputs the resulting data to 'path'"
     # print("In record_to_file")
+    # Två returnvalues från record
     sample_width, data = record()
-    # print("Mellan record och data =")
+
     data = pack('<' + ('h'*len(data)), *data)
 
     wf = wave.open(path, 'wb')
@@ -133,11 +173,13 @@ def record_to_file(path):
     wf.close()
 
 if __name__ == '__main__':
-    print("please speak a word into the microphone")
-    ii = 10
-    for ii  in range(10):
-        file = "output/demo{0:02d}.wav".format(ii)
+    #print("please speak a word into the microphone")
+    ii = 1
+    for ii  in range(99):
+        file = "slask\demo{0:02d}.wav".format(ii)
         # print(file, ii)
         record_to_file(file)
-        print("done - result written to " + file)
+        tiden = time.time()
+        Timestamp = str(datetime.datetime.fromtimestamp(tiden).strftime('%Y%m%d %H:%M:%S'))
+        print(file + " " + Timestamp)
         

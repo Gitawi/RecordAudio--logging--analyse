@@ -1,7 +1,7 @@
 
 
 # As a follow up to Nick Fortescue's answer, here's a more complete example of how to record from the microphone and process the resulting data:
-To make this work in Python 3 just replace xrange with range. – Ben Elgar Feb 23 '15 at 22:52
+# To make this work in Python 3 just replace range with range. – Ben Elgar Feb 23 '15 at 22:52
 
 from sys import byteorder
 from array import array
@@ -55,9 +55,9 @@ def trim(snd_data):
 
 def add_silence(snd_data, seconds):
     "Add silence to the start and end of 'snd_data' of length 'seconds' (float)"
-    r = array('h', [0 for i in xrange(int(seconds*RATE))])
+    r = array('h', [0 for i in range(int(seconds*RATE))])
     r.extend(snd_data)
-    r.extend([0 for i in xrange(int(seconds*RATE))])
+    r.extend([0 for i in range(int(seconds*RATE))])
     return r
 
 def record():

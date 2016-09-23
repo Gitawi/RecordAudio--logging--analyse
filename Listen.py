@@ -7,15 +7,19 @@ from struct import pack
 import time
 import datetime
 
+
 import pyaudio
 import wave
 
 # THRESHOLD = 500
-THRESHOLD = 10000
+THRESHOLD = 7000
+
 
 CHUNK_SIZE = 1024
 FORMAT = pyaudio.paInt16
 RATE = 44100
+
+
 
 def is_silent(snd_data):
     "Returns 'True' if below the 'silent' threshold"
@@ -80,68 +84,74 @@ def record():
     stream = p.open(format=FORMAT, channels=1, rate=RATE,
         input=True, output=True,
         frames_per_buffer=CHUNK_SIZE)
-
-    # Nollar startvärden
-    num_silent = 0
-    snd_started = False
-    snd_data = array('h', stream.read(CHUNK_SIZE))
-    if byteorder == 'big':
-            snd_data.byteswap()
-    # ... och ljudarrayen
-    r = array('h')
-
-    # Startar loopen
-    tiden = time.time()
-    Timestamp = str(datetime.datetime.fromtimestamp(tiden).strftime('%Y%m%d %H:%M:%S'))
-    print("\n Into While ... ", Timestamp)
-    while 1:
-        # little endian, signed short
-        # Laddar en chunk ur streamen till snd_data
-        # fortsätter streamen recorda??
-        snd_dataold = snd_data
+    
+    listen = True
+    while listen :
+        # Nollar startvärden
+        num_silent = 0
+        snd_started = False
         snd_data = array('h', stream.read(CHUNK_SIZE))
-        
         if byteorder == 'big':
-            snd_data.byteswap()
+                snd_data.byteswap()
+        # ... och ljudarrayen
+        r = array('h')
+        rextended = 0
 
-       
+        # Startar loopen
+        tiden = time.time()
+        Timestamp = str(datetime.datetime.fromtimestamp(tiden).strftime('%Y%m%d %H:%M:%S'))
+        print("\n Into While ... ", Timestamp)
+        while 1:
+            # little endian, signed short
+            # Laddar en chunk ur streamen till snd_data
+            # fortsätter streamen recorda??
+            snd_dataold = snd_data
+            snd_data = array('h', stream.read(CHUNK_SIZE))
+            
+            if byteorder == 'big':
+                snd_data.byteswap()
 
-        # r chunken tyst??
-        silent = is_silent(snd_data)
+        
 
-        # Testa nya chunken
-        if snd_started: 
-            # Lägg sista chunken till r - ljudarrayen
-            r.extend(snd_dataold)    
-            r.extend(snd_data)
-            if silent:
-                num_silent += 1
-            else:
-                num_silent = 0
-        else:
-            if not silent:
-                snd_started = True
-                # Addera sista chunken till r - ljudarrayen    
+            # Är chunken tyst??
+            silent = is_silent(snd_data)
+
+            # Testa nya chunken
+            if snd_started: 
+                # Lägg sista chunken till r - ljudarrayen
+                # r.extend(snd_dataold)    
                 r.extend(snd_data)
+                rextended += 1
+                if silent:
+                    num_silent += 1
+                else:
+                    num_silent = 0
+            else:
+                if not silent:
+                    snd_started = True
+                    Soundstart = time.time()
+        
+                    # Addera sista chunken till r - ljudarrayen    
+                    r.extend(snd_data)
+                    rextended += 1
+                    tiden = time.time()
+                    Timestamp = str(datetime.datetime.fromtimestamp(tiden).strftime('%Y%m%d %H:%M:%S'))
+                    print(" snd_started    ", Timestamp)
+                    
+        
+
+            if snd_started and num_silent > 200: # Varit tyst länge nu ...
                 tiden = time.time()
                 Timestamp = str(datetime.datetime.fromtimestamp(tiden).strftime('%Y%m%d %H:%M:%S'))
-                print(" snd_started    ", Timestamp)
-                
-                
-
-        # if silent and snd_started:   # Slut på ljud under inspelning
-        #     num_silent += 1
-        # elif not silent and not snd_started: # Ljud:-> Starta inspelning
-        #     snd_started = True 
-        # elif snd_started: # Ljud:-> Starta inspelning
-        #     snd_started = True
-            
-
-        if snd_started and num_silent > 500: # Varit tyst länge nu ...
-            tiden = time.time()
-            Timestamp = str(datetime.datetime.fromtimestamp(tiden).strftime('%Y%m%d %H:%M:%S'))
-            print(" Tyst för länge ", Timestamp)
-            break
+                print(" Tyst för länge ", Timestamp)
+                Soundend = time.time()
+                Secs = Soundend-Soundstart
+                print(" Secs{0:02f}, rextended {1:02d}".format( Secs, rextended))
+                # if Secs > 15 :
+                #     break
+                if rextended > 250 :
+                    listen = False
+                break
 
 
     
@@ -152,19 +162,25 @@ def record():
     stream.close()
     p.terminate()
 
-    # r = normalize(r)
-    # r = trim(r)
-    # r = add_silence(r, 0.5)
+    r = normalize(r)
+    r = trim(r)
+    r = add_silence(r, 0.5)
     return sample_width, r
 
 def record_to_file(path):
     "Records from the microphone and outputs the resulting data to 'path'"
     # print("In record_to_file")
     # Två returnvalues från record
+   
+        
     sample_width, data = record()
+        
+        
 
     data = pack('<' + ('h'*len(data)), *data)
 
+    
+   
     wf = wave.open(path, 'wb')
     wf.setnchannels(1)
     wf.setsampwidth(sample_width)

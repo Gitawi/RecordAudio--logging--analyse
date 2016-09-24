@@ -95,6 +95,7 @@ def record():
                 snd_data.byteswap()
         # ... och ljudarrayen
         r = array('h')
+        rtyst = array('h')
         rextended = 0
 
         # Startar loopen
@@ -105,7 +106,7 @@ def record():
             # little endian, signed short
             # Laddar en chunk ur streamen till snd_data
             # fortsätter streamen recorda??
-            snd_dataold = snd_data
+            # snd_dataold = snd_data
             snd_data = array('h', stream.read(CHUNK_SIZE))
             
             if byteorder == 'big':
@@ -120,15 +121,22 @@ def record():
             if snd_started: 
                 # Lägg sista chunken till r - ljudarrayen
                 # r.extend(snd_dataold)    
-                r.extend(snd_data)
-                rextended += 1
+                # r.extend(snd_data)
+                # rextended += 1
                 if silent:
                     num_silent += 1
+                    rtyst.extend(snd_data)
                 else:
+                    r.extend(rtyst)
+                    rextended += num_silent
                     num_silent = 0
+                    rtyst = array('h')
+                    r.extend(snd_data)
+                    rextended += 1
             else:
                 if not silent:
                     snd_started = True
+                    filenametime = str(datetime.datetime.fromtimestamp(time.time()).strftime('%Y%m%d %H%M%S - ')).lstrip("20")
                     Soundstart = time.time()
         
                     # Addera sista chunken till r - ljudarrayen    
@@ -140,16 +148,16 @@ def record():
                     
         
 
-            if snd_started and num_silent > 200: # Varit tyst länge nu ...
+            if snd_started and num_silent > 500: # Varit tyst länge nu ...
                 tiden = time.time()
                 Timestamp = str(datetime.datetime.fromtimestamp(tiden).strftime('%Y%m%d %H:%M:%S'))
                 print(" Tyst för länge ", Timestamp)
                 Soundend = time.time()
                 Secs = Soundend-Soundstart
                 print(" Secs{0:02f}, rextended {1:02d}".format( Secs, rextended))
-                # if Secs > 15 :
+                # if Secs > 25 :
                 #     break
-                if rextended > 250 :
+                if rextended > 5 : # 25 var OK
                     listen = False
                 break
 
@@ -163,9 +171,9 @@ def record():
     p.terminate()
 
     r = normalize(r)
-    r = trim(r)
-    r = add_silence(r, 0.5)
-    return sample_width, r
+    # r = trim(r)
+    # r = add_silence(r, 0.5)
+    return sample_width, r, filenametime
 
 def record_to_file(path):
     "Records from the microphone and outputs the resulting data to 'path'"
@@ -173,29 +181,34 @@ def record_to_file(path):
     # Två returnvalues från record
    
         
-    sample_width, data = record()
+    sample_width, data, filenametime = record()
         
         
 
     data = pack('<' + ('h'*len(data)), *data)
 
-    
+    # filenametime
+
+    filename = path + filenametime + "audiorec.wav"
    
-    wf = wave.open(path, 'wb')
+    wf = wave.open(filename, 'wb')
     wf.setnchannels(1)
     wf.setsampwidth(sample_width)
     wf.setframerate(RATE)
     wf.writeframes(data)
     wf.close()
+    tiden = time.time()
+    Timestamp = str(datetime.datetime.fromtimestamp(tiden).strftime('%Y%m%d %H:%M:%S'))
+    print(filename + " " + Timestamp)
 
 if __name__ == '__main__':
     #print("please speak a word into the microphone")
     ii = 1
     for ii  in range(99):
-        file = "slask\demo{0:02d}.wav".format(ii)
+       # file = "slask\demo{0:02d}.wav".format(ii)
+        path = "slask\\"
         # print(file, ii)
-        record_to_file(file)
-        tiden = time.time()
-        Timestamp = str(datetime.datetime.fromtimestamp(tiden).strftime('%Y%m%d %H:%M:%S'))
-        print(file + " " + Timestamp)
+        # record_to_file(file)
+        record_to_file(path)
+       
         

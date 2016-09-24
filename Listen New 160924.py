@@ -7,65 +7,47 @@ from struct import pack
 import time
 import datetime
 
-
 import pyaudio
 import wave
 
-# THRESHOLD = 500
+# Autorecording choices, seconds
 THRESHOLD = 7000
+TimeBeforeStart = 3
+TimeAfterEnd = 3
+AudioSaveToPath = "slask\\"
 
 
+# pyaudio settings
 CHUNK_SIZE = 1024
 FORMAT = pyaudio.paInt16
+MAXIMUM = 16384
 RATE = 44100
+ARRAYTYPE = array('h')
 
 
-
-def is_silent(snd_data):
+def timestamp():
+    return time.time()
+def filenamestamp():
+    return str(datetime.datetime.fromtimestamp(time.time()).strftime('%Y%m%d %H%M%S'))
+def printablestamp ():
+    return str(datetime.datetime.fromtimestamp(time.time()).strftime('%Y%m%d %H:%M:%S'))
+         
+def AnalyzeChunk(snd_data): # former is_silent
     "Returns 'True' if below the 'silent' threshold"
     #print(max(snd_data), end=", ", flush=True)
     return max(snd_data) < THRESHOLD
+    
+
 
 def normalize(snd_data):
     "Average the volume out"
-    MAXIMUM = 16384
-    times = float(MAXIMUM)/max(abs(i) for i in snd_data)
-    r = array('h')
+    scale = float(MAXIMUM)/max(abs(i) for i in snd_data)
+    r = ARRAYTYPE
     for i in snd_data:
-        r.append(int(i*times))
-        
+        r.append(int(i*scale))  
     return r
 
-def trim(snd_data):
-    "Trim the blank spots at the start and end"
-    def _trim(snd_data):
-        snd_started = False
-        r = array('h')
 
-        for i in snd_data:
-            if not snd_started and abs(i)>THRESHOLD:
-                snd_started = True
-                r.append(i)
-
-            elif snd_started:
-                r.append(i)
-        return r
-
-    # Trim to the left
-    snd_data = _trim(snd_data)
-
-    # Trim to the right
-    snd_data.reverse()
-    snd_data = _trim(snd_data)
-    snd_data.reverse()
-    return snd_data
-
-def add_silence(snd_data, seconds):
-    "Add silence to the start and end of 'snd_data' of length 'seconds' (float)"
-    r = array('h', [0 for i in range(int(seconds*RATE))])
-    r.extend(snd_data)
-    r.extend([0 for i in range(int(seconds*RATE))])
-    return r
 
 def record():
     
@@ -99,9 +81,9 @@ def record():
         rextended = 0
 
         # Startar loopen
-        tiden = time.time()
-        Timestamp = str(datetime.datetime.fromtimestamp(tiden).strftime('%Y%m%d %H:%M:%S'))
-        print("\n Into While ... ", Timestamp)
+        # tiden = time.time()
+        # Timestamp = str(datetime.datetime.fromtimestamp(tiden).strftime('%Y%m%d %H:%M:%S'))
+        print("\n Into While ... ", printablestamp())
         while 1:
             # little endian, signed short
             # Laddar en chunk ur streamen till snd_data
@@ -115,7 +97,7 @@ def record():
         
 
             # Är chunken tyst??
-            silent = is_silent(snd_data)
+            silent = AnalyzeChunk(snd_data)
 
             # Testa nya chunken
             if snd_started: 
@@ -170,27 +152,18 @@ def record():
     stream.close()
     p.terminate()
 
-    r = normalize(r)
+    to_file(r, sample_width, filenametime)
+
+def to_file (data, sample_width, filenametime):
+    data = normalize(data)
     # r = trim(r)
     # r = add_silence(r, 0.5)
-    return sample_width, r, filenametime
-
-def record_to_file(path):
-    "Records from the microphone and outputs the resulting data to 'path'"
-    # print("In record_to_file")
-    # Två returnvalues från record
-   
-        
-    sample_width, data, filenametime = record()
-        
-        
-
+    # return sample_width, r, filenametime
     data = pack('<' + ('h'*len(data)), *data)
 
     # filenametime
 
-    filename = path + filenametime + "audiorec.wav"
-   
+    filename = AudioSaveToPath + filenametime + "audiorec.wav"
     wf = wave.open(filename, 'wb')
     wf.setnchannels(1)
     wf.setsampwidth(sample_width)
@@ -201,14 +174,51 @@ def record_to_file(path):
     Timestamp = str(datetime.datetime.fromtimestamp(tiden).strftime('%Y%m%d %H:%M:%S'))
     print(filename + " " + Timestamp)
 
+
+
+
+
 if __name__ == '__main__':
     #print("please speak a word into the microphone")
     ii = 1
     for ii  in range(99):
-       # file = "slask\demo{0:02d}.wav".format(ii)
-        path = "slask\\"
-        # print(file, ii)
-        # record_to_file(file)
-        record_to_file(path)
+        record()
+
+
+
+
+
+# def trim(snd_data):
+#     "Trim the blank spots at the start and end"
+#     def _trim(snd_data):
+#         snd_started = False
+#         r = array('h')
+
+#         for i in snd_data:
+#             if not snd_started and abs(i)>THRESHOLD:
+#                 snd_started = True
+#                 r.append(i)
+
+#             elif snd_started:
+#                 r.append(i)
+#         return r
+
+#     # Trim to the left
+#     snd_data = _trim(snd_data)
+
+#     # Trim to the right
+#     snd_data.reverse()
+#     snd_data = _trim(snd_data)
+#     snd_data.reverse()
+#     return snd_data
+
+# def add_silence(snd_data, seconds):
+#     "Add silence to the start and end of 'snd_data' of length 'seconds' (float)"
+#     r = array('h', [0 for i in range(int(seconds*RATE))])
+#     r.extend(snd_data)
+#     r.extend([0 for i in range(int(seconds*RATE))])
+#     return r
+
+
        
         

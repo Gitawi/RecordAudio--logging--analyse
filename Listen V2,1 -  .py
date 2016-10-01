@@ -15,8 +15,45 @@ import wave
 import timeit
 import logging
 
-logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%y%m%d %H:%M:%S', level=logging.DEBUG , filename = sys.stdout)
-# logging.warning('is when this event was logged.')
+logger = logging.getLogger('testmodule')
+def loggsetup(logger) :
+    
+    logger.setLevel(logging.DEBUG)
+
+    """
+    Loggar till 2 filehandles, en fil och en stderror
+    """
+
+    # create file handler which logs even debug messages
+    fh = logging.FileHandler('slask\\'+str(datetime.datetime.fromtimestamp(time.time()).strftime('%y%m%d %H%M%S'))+".log")
+    fh.setLevel(logging.DEBUG)
+
+    # create console handler with a higher log level
+    ch = logging.StreamHandler()
+    ch.setLevel(logging.INFO)
+
+    # Formatter 2 nedan är bäst
+
+
+    # create formatter with '{'-str.format()  formatting style and add it to the handlers - Verkar bäst
+    formatter2 = logging.Formatter('{asctime}/{name}/{lineno:0=3}/{levelname:9}{message}', datefmt='%y%m%d/%H:%M:%S', style='{')
+    ch.setFormatter(formatter2)
+    fh.setFormatter(formatter2)
+    logger.addHandler(ch)
+    logger.addHandler(fh)
+
+
+    # logger.debug('debug message formatter2')
+    # logger.info('info message formatter2')
+    # logger.warn('warn message formatter2')
+    # logger.error('error message formatter2')
+    # logger.critical('critical message formatter2')
+
+    logger.info("ProgramRun Started" )
+    logger.info("THRESHOLD_START ="+ str(THRESHOLD_START)  +  "\t THRESHOLD_CONT =" + str(THRESHOLD_CONT)  )
+    logger.info("CHUNKS_NOOF =" +  str(CHUNKS_NOOF) +  "\t CHUNK_SIZE =" +  str(CHUNK_SIZE) +  "\t RATE =" + str(RATE)   )
+    logger.info("PLOT_SCALE =" +  str(PLOT_SCALE) +  "\t PLOT_DPI =" +  str(PLOT_DPI) +  "\t PLOT_FIGSIZE =" +  str(PLOT_FIGSIZE) )
+    logger.info("WAVE_ENDADDS =" +  str(WAVE_ENDADDS) + "\t SAVE_TO_DIR =" +  str(SAVE_TO_DIR) +  "\t RUN_START =" +  str(RUN_START) + "\n\n" )
 
 
 """
@@ -77,11 +114,6 @@ PLOT_DPI = 100
 SAVE_TO_DIR = "slask\\"
 RUN_START = str(datetime.datetime.fromtimestamp(time.time()).strftime('%y%m%d %H %M %S'))
 
-logging.info("ProgramRun Started" )
-logging.info("THRESHOLD_START ="+ str(THRESHOLD_START)  +  "\t THRESHOLD_CONT =" + str(THRESHOLD_CONT)  )
-logging.info("CHUNKS_NOOF =" +  str(CHUNKS_NOOF) +  "\t CHUNK_SIZE =" +  str(CHUNK_SIZE) +  "\t RATE =" + str(RATE)   )
-logging.info("PLOT_SCALE =" +  str(PLOT_SCALE) +  "\t PLOT_DPI =" +  str(PLOT_DPI) +  "\t PLOT_FIGSIZE =" +  str(PLOT_FIGSIZE) )
-logging.info("WAVE_ENDADDS =" +  str(WAVE_ENDADDS) + "\t SAVE_TO_DIR =" +  str(SAVE_TO_DIR) +  "\t RUN_START =" +  str(RUN_START) + "\n\n" )
 
 
 # # Autorecording choices, seconds
@@ -107,13 +139,13 @@ def timing(Title, onoff) :
     # Always time.clock() on windows
     if onoff == "on" :
         timing.LastTime = time.clock()
-        logging.info(Title )
+        logger.info(Title )
     elif onoff == "off" :
         tid = time.clock() - timing.LastTime
         Chunksrate = round(CHUNKS_NOOF/tid)
-        logging.info(Title + " klart: " + str(round(tid,4)) + "secs " )
+        logger.info(Title + " klart: " + str(round(tid,4)) + "secs " )
     else : 
-        logging.error("on/off saknas i timing-argumenten")
+        logger.error("on/off saknas i timing-argumenten")
 timing.LastTime = 0.0 # Hör till functionsobjectet "timing som en property. Måste initialiseras"
 
 
@@ -240,7 +272,7 @@ def listen() :
         if ii > THRESHOLD_CONT :
             RepTxt = RepTxt + ", ii=" + str(ii) 
             ListQ[ii][0][0] = RepTxt
-            logging.warning("ToLong - Break")
+            logger.warning("ToLong - Break")
             break
 
         # Continue recording?
@@ -389,6 +421,7 @@ def listen() :
    
 
     rr = 0 # Stanna upp en stund
+loggsetup(logger)
 # RunTimeData()
 listen()
 

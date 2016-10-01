@@ -14,7 +14,8 @@ import pyaudio
 import wave
 import timeit
 import logging
-logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%y%m%d %H:%M:%S', level=logging.DEBUG, filename = "slask/log.log")
+
+logging.basicConfig(format='%(asctime)s %(message)s', datefmt='%y%m%d %H:%M:%S', level=logging.DEBUG , filename = sys.stdout)
 # logging.warning('is when this event was logged.')
 
 
@@ -74,7 +75,7 @@ PLOT_SCALE = 1000
 PLOT_FIGSIZE = (22,7)
 PLOT_DPI = 100
 SAVE_TO_DIR = "slask\\"
-RUN_START = str(datetime.datetime.fromtimestamp(time.clock()).strftime('%y%m%d %H %M %S'))
+RUN_START = str(datetime.datetime.fromtimestamp(time.time()).strftime('%y%m%d %H %M %S'))
 
 logging.info("ProgramRun Started" )
 logging.info("THRESHOLD_START ="+ str(THRESHOLD_START)  +  "\t THRESHOLD_CONT =" + str(THRESHOLD_CONT)  )

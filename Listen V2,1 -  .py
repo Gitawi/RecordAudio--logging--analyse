@@ -8,6 +8,8 @@ import time
 import matplotlib.pyplot as plt
 import csv
 #from numpy import fft
+from SQLiteHandler_kessler import SQLiteHandler # Mer detaljer loggas t.ex threads
+
 
 
 import pyaudio
@@ -15,45 +17,62 @@ import wave
 import timeit
 import logging
 
-logger = logging.getLogger('testmodule')
-def loggsetup(logger) :
+# Run identification. Use as unique but identifiable filename, ad extension and path
+RunID = str(datetime.datetime.fromtimestamp(time.time()).strftime('%y%m%d %H%M%S'))
+
+
+def loggsetup() :
     
-    logger.setLevel(logging.DEBUG)
-
     """
-    Loggar till 2 filehandles, en fil och en stderror
+    Logs to different destinations, individually or multidestination
     """
 
-    # create file handler which logs even debug messages
-    fh = logging.FileHandler('slask\\'+str(datetime.datetime.fromtimestamp(time.time()).strftime('%y%m%d %H%M%S'))+".log")
+    # Create Message Formatters to be used below with different output-handlers
+    # 3 alternative string formatting styles tested. I preferred '{' i.e. formatting no 1
+    # 1c,1f,1s a little different - to be used for different destinations = outputhandlers = handlers i.e.for console, file, SQLite db
+    formatter1f = logging.Formatter('{asctime}/{name}/{lineno:0=3}/{levelname:9}{message}', datefmt='%y%m%d/%H:%M:%S', style='{')
+    formatter1c = logging.Formatter('{asctime}/{name}/{lineno:0=3}/{levelname:9}{message}', datefmt='%H:%M:%S', style='{')
+    formatter1s = logging.Formatter('{name}/{lineno:0=3}/{levelname:9}{message}', datefmt='%H:%M:%S', style='{')
+
+
+    # Initiate python logging with several "logger"s 
+    # file-logger
+    loggerf = logging.getLogger(__name__+' file')
+    loggerf.setLevel(logging.DEBUG)
+    fh = logging.FileHandler('slask\\'+RunID+".txt")
+    fh.setFormatter(formatter1f)
     fh.setLevel(logging.DEBUG)
+    loggerf.addHandler(fh)
 
-    # create console handler with a higher log level
+    # console-logger
+    loggerc = logging.getLogger(__name__+' console')
+    loggerc.setLevel(logging.DEBUG)
     ch = logging.StreamHandler()
+    ch.setFormatter(formatter1c)
     ch.setLevel(logging.INFO)
+    loggerc.addHandler(ch)
 
-    # Formatter 2 nedan är bäst
+    # SQlite-logger
+    loggers = logging.getLogger(__name__+' sql')
+    loggers.setLevel(logging.DEBUG)
+    sq = SQLiteHandler('slask\\'+RunID+'.sqlite')
+    sq.setFormatter(formatter1s)
+    sq.setLevel(logging.DEBUG)
+    loggers.addHandler(sq)
+
+    # Multi-logger
+    loggerm = logging.getLogger(__name__)
+    loggerm.setLevel(logging.DEBUG)
+    loggerm.addHandler(sq)
+    loggerm.addHandler(ch)
+    loggerm.addHandler(fh)
+
+    return loggerm
+
+logger = loggsetup()
 
 
-    # create formatter with '{'-str.format()  formatting style and add it to the handlers - Verkar bäst
-    formatter2 = logging.Formatter('{asctime}/{name}/{lineno:0=3}/{levelname:9}{message}', datefmt='%y%m%d/%H:%M:%S', style='{')
-    ch.setFormatter(formatter2)
-    fh.setFormatter(formatter2)
-    logger.addHandler(ch)
-    logger.addHandler(fh)
 
-
-    # logger.debug('debug message formatter2')
-    # logger.info('info message formatter2')
-    # logger.warn('warn message formatter2')
-    # logger.error('error message formatter2')
-    # logger.critical('critical message formatter2')
-
-    logger.info("ProgramRun Started" )
-    logger.info("THRESHOLD_START ="+ str(THRESHOLD_START)  +  "\t THRESHOLD_CONT =" + str(THRESHOLD_CONT)  )
-    logger.info("CHUNKS_NOOF =" +  str(CHUNKS_NOOF) +  "\t CHUNK_SIZE =" +  str(CHUNK_SIZE) +  "\t RATE =" + str(RATE)   )
-    logger.info("PLOT_SCALE =" +  str(PLOT_SCALE) +  "\t PLOT_DPI =" +  str(PLOT_DPI) +  "\t PLOT_FIGSIZE =" +  str(PLOT_FIGSIZE) )
-    logger.info("WAVE_ENDADDS =" +  str(WAVE_ENDADDS) + "\t SAVE_TO_DIR =" +  str(SAVE_TO_DIR) +  "\t RUN_START =" +  str(RUN_START) + "\n\n" )
 
 
 """
@@ -114,23 +133,12 @@ PLOT_DPI = 100
 SAVE_TO_DIR = "slask\\"
 RUN_START = str(datetime.datetime.fromtimestamp(time.time()).strftime('%y%m%d %H %M %S'))
 
+logger.info("ProgramRun Started" )
+logger.info("THRESHOLD_START ="+ str(THRESHOLD_START)  +  "\t THRESHOLD_CONT =" + str(THRESHOLD_CONT)  )
+logger.info("CHUNKS_NOOF =" +  str(CHUNKS_NOOF) +  "\t CHUNK_SIZE =" +  str(CHUNK_SIZE) +  "\t RATE =" + str(RATE)   )
+logger.info("PLOT_SCALE =" +  str(PLOT_SCALE) +  "\t PLOT_DPI =" +  str(PLOT_DPI) +  "\t PLOT_FIGSIZE =" +  str(PLOT_FIGSIZE) )
+logger.info("WAVE_ENDADDS =" +  str(WAVE_ENDADDS) + "\t SAVE_TO_DIR =" +  str(SAVE_TO_DIR) +  "\t RUN_START =" +  RunID + "\n\n" )
 
-
-# # Autorecording choices, seconds
-# THRESHOLD_START = 7000
-# # THRESHOLD = 7000
-# THRESHOLD_CONT = 1500
-# SAVE_TO_DIR = "slask\\"
-# # RunStart = 
-
-# # pyaudio settings
-# CHUNK_SIZE = 1024
-# FORMAT = pyaudio.paInt16
-# # FORMAT = np.int16
-# MAXIMUM = 16384
-# RATE = 8000
-# # RATE = 44100
-# ARRAYTYPE = array('h') 
 
 
 def timing(Title, onoff) :
@@ -421,8 +429,7 @@ def listen() :
    
 
     rr = 0 # Stanna upp en stund
-loggsetup(logger)
-# RunTimeData()
+
 listen()
 
 

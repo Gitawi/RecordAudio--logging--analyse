@@ -5,6 +5,7 @@
 *.pydevproject
 .project
 .metadata
+Loggerdef.py
 bin/
 tmp/
 slask/

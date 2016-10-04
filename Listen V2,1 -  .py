@@ -1,5 +1,6 @@
 import numpy as np
 from sys import byteorder
+from sys import getsizeof
 from array import array
 from struct import pack
 from time import process_time
@@ -7,69 +8,17 @@ import datetime
 import time
 import matplotlib.pyplot as plt
 import csv
-#from numpy import fft
-from SQLiteHandler_kessler import SQLiteHandler # Mer detaljer loggas t.ex threads
-
-
-
+from Loggerdef import loggsetup 
 import pyaudio
 import wave
 import timeit
-import logging
 
 # Run identification. Use as unique but identifiable filename, ad extension and path
-RunID = str(datetime.datetime.fromtimestamp(time.time()).strftime('%y%m%d %H%M%S'))
+RunID = datetime.datetime.now().strftime('%y%m%d %H%M%S')
+# RunID = str(datetime.datetime.fromtimestamp(time.time()).strftime('%y%m%d %H%M%S'))
+AppID = "AudioRec"
 
-
-def loggsetup() :
-    
-    """
-    Logs to different destinations, individually or multidestination
-    """
-
-    # Create Message Formatters to be used below with different output-handlers
-    # 3 alternative string formatting styles tested. I preferred '{' i.e. formatting no 1
-    # 1c,1f,1s a little different - to be used for different destinations = outputhandlers = handlers i.e.for console, file, SQLite db
-    formatter1f = logging.Formatter('{asctime}/{name}/{lineno:0=3}/{levelname:9}{message}', datefmt='%y%m%d/%H:%M:%S', style='{')
-    formatter1c = logging.Formatter('{asctime}/{name}/{lineno:0=3}/{levelname:9}{message}', datefmt='%H:%M:%S', style='{')
-    formatter1s = logging.Formatter('{name}/{lineno:0=3}/{levelname:9}{message}', datefmt='%H:%M:%S', style='{')
-
-
-    # Initiate python logging with several "logger"s 
-    # file-logger
-    loggerf = logging.getLogger(__name__+' file')
-    loggerf.setLevel(logging.DEBUG)
-    fh = logging.FileHandler('slask\\'+RunID+".txt")
-    fh.setFormatter(formatter1f)
-    fh.setLevel(logging.DEBUG)
-    loggerf.addHandler(fh)
-
-    # console-logger
-    loggerc = logging.getLogger(__name__+' console')
-    loggerc.setLevel(logging.DEBUG)
-    ch = logging.StreamHandler()
-    ch.setFormatter(formatter1c)
-    ch.setLevel(logging.INFO)
-    loggerc.addHandler(ch)
-
-    # SQlite-logger
-    loggers = logging.getLogger(__name__+' sql')
-    loggers.setLevel(logging.DEBUG)
-    sq = SQLiteHandler('slask\\'+RunID+'.sqlite')
-    sq.setFormatter(formatter1s)
-    sq.setLevel(logging.DEBUG)
-    loggers.addHandler(sq)
-
-    # Multi-logger
-    loggerm = logging.getLogger(__name__)
-    loggerm.setLevel(logging.DEBUG)
-    loggerm.addHandler(sq)
-    loggerm.addHandler(ch)
-    loggerm.addHandler(fh)
-
-    return loggerm
-
-logger = loggsetup()
+logger, = loggsetup(RunID,AppID,("multi",))
 
 
 
@@ -118,10 +67,11 @@ Kanske bra att spara csv-filen med data och en graf med varje inspelning tills v
 # Settings during the run
 
 # Autorecording choices, seconds
-THRESHOLD_START = 5500
-THRESHOLD_CONT = 1500
+THRESHOLD_AMP = 5500
+THRESHOLD_VAR = 30000  # denna verkar ta mer prat än höga ljud
+THRESHOLD_STD = 0.27
 # File size & Quality etc
-CHUNKS_NOOF = 10 # Hur läng skall det lyssnas, antal CHUNKS_NOOF = CHUNK_SIZE
+CHUNKS_NOOF = 25 # Hur länge skall det lyssnas, antal CHUNKS_NOOF = CHUNK_SIZE
 RATE = 8000
 CHUNK_SIZE = 1024
 FORMAT = pyaudio.paInt16
@@ -131,10 +81,10 @@ PLOT_SCALE = 1000
 PLOT_FIGSIZE = (22,7)
 PLOT_DPI = 100
 SAVE_TO_DIR = "slask\\"
-RUN_START = str(datetime.datetime.fromtimestamp(time.time()).strftime('%y%m%d %H %M %S'))
+RUN_START = RunID
 
-logger.info("ProgramRun Started" )
-logger.info("THRESHOLD_START ="+ str(THRESHOLD_START)  +  "\t THRESHOLD_CONT =" + str(THRESHOLD_CONT)  )
+logger.info("ProgramRun Started: " + RunID )
+logger.info("THRESHOLD_AMP ="+ str(THRESHOLD_AMP)  +  "\t THRESHOLD_STD =" + str(THRESHOLD_STD)  )
 logger.info("CHUNKS_NOOF =" +  str(CHUNKS_NOOF) +  "\t CHUNK_SIZE =" +  str(CHUNK_SIZE) +  "\t RATE =" + str(RATE)   )
 logger.info("PLOT_SCALE =" +  str(PLOT_SCALE) +  "\t PLOT_DPI =" +  str(PLOT_DPI) +  "\t PLOT_FIGSIZE =" +  str(PLOT_FIGSIZE) )
 logger.info("WAVE_ENDADDS =" +  str(WAVE_ENDADDS) + "\t SAVE_TO_DIR =" +  str(SAVE_TO_DIR) +  "\t RUN_START =" +  RunID + "\n\n" )
@@ -176,7 +126,7 @@ def trim(snd_data):
         r = array('h')
 
         for i in snd_data:
-            if not snd_started and abs(i)>THRESHOLD_START:
+            if not snd_started and abs(i)>THRESHOLD_AMP:
                 snd_started = True
                 r.append(i)
 
@@ -209,7 +159,7 @@ def listen() :
         input=True, output=True,
         frames_per_buffer=CHUNK_SIZE)
     ListQ = []
-    ListQ.append([["", "Max", "Std", "ArrTid" , "SekvTime", "arg", "Var", "Mean", "Median"],"Histo","Arr"])
+    ListQ.append([["Text", "Max", "Std", "ArrTid" , "SekvTime", "arg", "Var", "Mean", "Median"],"Histo","Arr"])
     # TimeList = [["ii", "Anatime","Arrtime", "Listtime"]]
 
     
@@ -218,6 +168,8 @@ def listen() :
     ProspNdxOn = -1
     timing("Recording", "on")
     for ii in range(1,CHUNKS_NOOF) :
+        if 0 == ii%25 : print(ii,end=' ')
+        # if ii == CHUNKS_NOOF : print(ii,)
         arr = np.array(array('h', stream.read(CHUNK_SIZE)))
         if byteorder == 'big':
             snd_data.byteswap()
@@ -230,11 +182,8 @@ def listen() :
 
       
     # Analysera Listan med ljud, per dump och slå ihop en hel ArrTot
-    # ArrTot0 = array('h')
-    # ArrVarAcc = 0
     MaxArrMax = MinArrMax = MaxArrVar = MinArrVar = MaxArrStd = MinArrStd = 0
-    Spara = 0
-    # AnaTime = time.time()
+    Recording = 0
     timing("Analys", "on")
     for ii in range(1,CHUNKS_NOOF) :
         tup = ListQ[ii][0]
@@ -245,12 +194,9 @@ def listen() :
         ArrMaxNdx = np.argmax(np.absolute(arr)) 
         ArrMean   = round(np.mean(np.absolute(arr)) ) 
         ArrMedian   = np.median(np.absolute(arr))
-        #ArrMeaDivMed = round(ArrMean/ArrMedian)
         ArrVar   = round(np.var(np.absolute(arr)) )
         MaxArrVar = max(MaxArrVar,ArrVar)
         MinArrVar - min(MinArrVar,ArrVar) 
-        #ArrVarTip = ArrVar/ArrVarAcc*1000
-        # ArrVarAcc += ArrVar/5
         ArrStd   = round(np.std(np.absolute(arr)) )
         MaxArrStd = max(MaxArrStd,ArrStd)
         MinArrStd - min(MinArrStd,ArrStd) 
@@ -263,38 +209,39 @@ def listen() :
     
         RepTxt = ""
         # Start recording?
-        if ArrMaxAmp < THRESHOLD_START :
+        
+        # Filstorlek Listening?
+        if 0 == (ii%600) :
+            RepTxt = RepTxt + ", ii=" + str(ii) + ", size=" + str(getsizeof(ListQ)) 
+            ListQ[ii][0][0] = RepTxt
+            logger.warning("Long " + RepTxt)
+            # break
+        
+        if ArrMaxAmp < THRESHOLD_AMP :
             RepTxt = RepTxt + "Silent, "
-            Spara -= 1
+            Recording -= 1
         else :
             RepTxt = RepTxt + "Sound, "
-            Spara = max(Spara, 10)
+            Recording = max(Recording, 15)
             if ProspNdxOn < 0 :
                 ProspNdxOn = ii 
-                RepTxt =  "Spara = 10 " + RepTxt
-            
+                RepTxt =  "Recording = "+str(Recording)  + RepTxt
+                
         # ListQ[ii][0][0] = RepTxt
-
-
-        # Continu Listening?
-        if ii > THRESHOLD_CONT :
-            RepTxt = RepTxt + ", ii=" + str(ii) 
-            ListQ[ii][0][0] = RepTxt
-            logger.warning("ToLong - Break")
-            break
-
+        
         # Continue recording?
-        if Spara > 2 :
-                RepTxt = "Sparar " + str(Spara) + " " + RepTxt
-        elif Spara > 0:
-            VarLev = (ArrVar - MinArrVar)/(MaxArrVar - MinArrVar)
-            StdLev = (ArrStd - MinArrStd)/(MaxArrStd - MinArrStd)
-            if VarLev + StdLev  > THRESHOLD_CONT :
-                RepTxt =  "Spara,  Öka till 3, " + RepTxt
-                Spara = max(Spara,3)
+        VarLev = (ArrVar - MinArrVar)/(MaxArrVar - MinArrVar)
+        StdLev = (ArrStd - MinArrStd)/(MaxArrStd - MinArrStd)
+        VSSum = VarLev + StdLev
+        if Recording > 2 :
+                RepTxt = "Sparar " + str(Recording) + " VSSum" + str(VSSum) +"/"+ RepTxt
+        elif Recording > 0:
+            if VarLev + StdLev  > THRESHOLD_STD :
+                RepTxt =  "Recording,  Öka till 5, " + RepTxt
+                Recording = max(Recording,5)
             else:
                 RepTxt = "Sparat klart "
-                for xx in range((ProspNdxOn-3),ProspNdxOn) :
+                for xx in range((ProspNdxOn-5),ProspNdxOn) :
                     ListQ[xx][0][0] = "Sparar före  " + ListQ[xx][0][0]
                 ProspNdxOn = -1
         ListQ[ii][0][0] = RepTxt
@@ -316,7 +263,7 @@ def listen() :
     # Export data to csv, 
     timing("Cvs export", "on")
 
-    filename = SAVE_TO_DIR + str(datetime.datetime.fromtimestamp(ListQTime).strftime('%y%m%d %H%M%S')) + ".csv"
+    filename = SAVE_TO_DIR + RunID + ".csv"
     tuple = [xx[0] for xx in ListQ] 
     with open(filename, 'w', newline='') as f:
         writer = csv.writer(f)
@@ -328,64 +275,74 @@ def listen() :
     # Build total wave file
     ListQ[0][2] = ListQ[1][2]
     ArrTot0 = array('h')
-    # ArrTot0.extend([yy[1] for yy in ListQ])
+    ArrSpar = arrtmp = array('i')
+    ArrChunks=array('h', (aa for aa in range(0,CHUNKS_NOOF*CHUNK_SIZE)))
     for ii in range(CHUNKS_NOOF) :
-        ArrTot0.extend(ListQ[ii][2]) 
+        ArrTot0.extend(ListQ[ii][2])
+        lev = 8000 
+        if "Silent" in  ListQ[ii][0][0][0:10] : 
+            lev = 0
+        arrtmp = array('i',(lev for i in range(0,1024)))
+        ArrSpar.extend(arrtmp)
+
     ArrTot = np.array(ArrTot0)
-    ArrTot = normalize(ArrTot)
-    ArrTot = trim(ArrTot)
 
 
 
-    # Prepare for plottin
+    # Prepare ListQ for plottin
     timing("Plot", "on")
     ArrMax = [yy[1] for yy in [xx[0] for xx in ListQ]]
     ArrStd = [yy[2] for yy in [xx[0] for xx in ListQ]]
-    # ArrDiv = [yy[3] for yy in [xx[0] for xx in ListQ]]
-    # ArrVarTip= [yy[4] for yy in [xx[0] for xx in ListQ]]
     ArrVar = [yy[6] for yy in [xx[0] for xx in ListQ]]
 
-
-
     
-    ArrMax[0] = 2000
+    ArrMax[0] = 100
     ArrStd[0] = 200
-    # ArrDiv[0] = 1
-    ArrVar[0] = 1000
-    # ArrVarTip[0] = 1000
-    # Scale the variables
-    # Scale = 1000
+    ArrVar[0] = 100
     for ii in range(CHUNKS_NOOF) :
         ArrMax[ii] = round(ArrMax[ii]/MaxArrMax * PLOT_SCALE)
         ArrVar[ii] = round(ArrVar[ii]/MaxArrVar * PLOT_SCALE)
         ArrStd[ii] = round(ArrStd[ii]/MaxArrStd * PLOT_SCALE)
+        HorAmp = PLOT_SCALE *THRESHOLD_AMP/MaxArrMax
+        HorVar = PLOT_SCALE *THRESHOLD_VAR/MaxArrVar
+        HorStd = PLOT_SCALE *THRESHOLD_STD/MaxArrStd
         
-    # ArrVar[ii]  = round(ArrVar[ii] /1000)
     
+    logger.info("Plot: Audio nyckelvärden")
     plt.figure(1, figsize=PLOT_FIGSIZE, dpi=PLOT_DPI)
-    plt.title('Audio nyckelvärden  ... ' + str(datetime.datetime.fromtimestamp(ListQTime).strftime('%y%m%d %H%M%S')))
-    # plt.xlabel('ArrMax')
-    # plt.ylabel('ArrStd')
-
-    # plt.plot(ArrDiv,'bs')
+    plt.title('Audio nyckelvärden  ... ' + RunID +"/ "+ AppID)
     plt.plot(ArrStd,'r-', label = "Stdavvikelse")
     plt.plot(ArrMax,'b-' ,label = "Ampmax")
     plt.plot(ArrVar,'k-' ,label = "Variance")
+    plt.axhline(y=HorAmp, color = "b")
+    plt.axhline(y=HorVar, color = "m")
+    plt.axhline(y=HorStd, color = "r")
+
+
     plt.legend(loc='upper left')
-    # for item in ([ax.title, ax.xaxis.label, ax.yaxis.label] +
-    #          ax.get_xticklabels() + ax.get_yticklabels()):
-    #     item.set_fontsize(20)
-    # plt.plot(ArrVarTip,'r:^')
-    # Spara plotten som fil
-    filen = filename.replace(".csv","-1.png")
+    filen = SAVE_TO_DIR + RunID + "-1.png"
     plt.savefig(filen, bbox_inches='tight')
 
+    logger.info("Plot: Audio filen")
     plt.figure(2, figsize=PLOT_FIGSIZE, dpi=PLOT_DPI)
-    plt.title('Audio filen  ... ' + str(datetime.datetime.fromtimestamp(ListQTime).strftime('%y%m%d %H%M%S')))
-    plt.plot(ArrTot)
-    filen = filename.replace(".csv","-2.png")
+    plt.title('Audio filen  ... ' + RunID +"/ "+ AppID)
+    plt.plot(ArrChunks,np.absolute(ArrTot))
+    plt.plot(ArrSpar,'m-', label="Recording")
+    plt.axhline(y=THRESHOLD_AMP)    
+    # plt.xaxis.set_major_locator(plt.MultipleLocator(10*CHUNK_SIZE))
+    plt.plot(ArrChunks,'c^')
+    plt.ylim(-100,15000)
+    filen = SAVE_TO_DIR + RunID + "-2.png"
     plt.savefig(filen, bbox_inches='tight')
 
+    logger.info("Plot: Audio histogram")
+    plt.figure(3, figsize=PLOT_FIGSIZE, dpi=PLOT_DPI)
+    # width = 0.7 * (bins[1] - bins[0])
+    # center = (bins[:-1] + bins[1:]) / 2
+    plt.hist(np.absolute(ArrTot),50)
+    plt.title(('Histogram   ... {0}/  {1}').format( RunID, AppID))
+    filen = SAVE_TO_DIR + RunID + "-3.png"
+    plt.savefig(filen, bbox_inches='tight')
 
   # Visa bådda figures
     #plt.show()
@@ -400,13 +357,15 @@ def listen() :
     timing("Wave export", "on")
 
     # OBS  plt.plot(ArrTot) klarar inte att plotta ArrTot om den packats först, krashar
-    ArrTot = add_silence(ArrTot, WAVE_ENDADDS)   # Here not to affect the plots
+    # ArrTot = normalize(ArrTot)
+    #ArrTot = trim(ArrTot) #(för att inte förstöra indexet mellan plot och csv-fil)
+    #ArrTot = add_silence(ArrTot, WAVE_ENDADDS)   # Here not to affect the plots
     sample_width = p.get_sample_size(FORMAT)
-    ArrTot = pack('<' + ('h'*len(ArrTot)), *ArrTot)
+    #ArrTot = pack('<' + ('h'*len(ArrTot)), *ArrTot)
     # OBS  plt.plot(ArrTot) klarar inte att plotta ArrTot om den packats först
 
 
-    filen = filename.replace(".csv",".wav")
+    filen = SAVE_TO_DIR + RunID + ".wav"
    
     wf = wave.open(filen, 'wb')
     wf.setnchannels(1)
@@ -418,15 +377,6 @@ def listen() :
     timing("Wave export", "off")
 
 
- # Visa båda figures
-    # plt.show()
-
-
-  
-
-
-
-   
 
     rr = 0 # Stanna upp en stund
 
